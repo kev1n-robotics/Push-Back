@@ -23,17 +23,20 @@ void Robot::initialize() {
   aon::lemlib_integration::initializeChassis();
   // Native slot 1 remains the safe fallback until the GUI applies selection.
   aon::autonomousReader->AddFunction("autonomous", aon::routines::RedRoutine1);
-  pros::Task guiLoopTask([] { aon::gui->initialize(); });
+  // GUI task needs extra stack because stopAndSave() → process() → appendMotionPoints()
+  // allocates ~41 KB of local arrays when the user presses STOP.
+  pros::Task guiLoopTask([] { aon::gui->initialize(); }, TASK_PRIORITY_DEFAULT, 0x4000, "gui-loop");
   pros::delay(3000);
   pros::Task safetyTask(aon::autonSafety);
   pros::Task intakeScanning([] { intake.scan(); });
   pros::Task intakeSorting([] { intake.sort(); });
+  // Shadow task also calls stopAndSave() on auto-stop; needs the same large stack.
   static pros::Task shadowRecorderTask([] {
     while (true) {
       aon::shadow::service().pollRecorder();
       pros::delay(aon::shadow::kSamplePeriodMs);
     }
-  });
+  }, TASK_PRIORITY_DEFAULT, 0x4000, "shadow-recorder");
 #endif
 }
 
