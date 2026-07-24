@@ -9,9 +9,9 @@ namespace aon::shadow {
 namespace {
 
 ResultCode readOpenFailure() {
-  if (errno == EROFS) return ResultCode::ReadOnly;
-  return errno == ENOENT ? ResultCode::EmptyRecording
-                         : ResultCode::OpenFailed;
+  // PROS/V5 does not reliably set errno = ENOENT for missing files;
+  // treat any non-EROFS read failure as an empty (non-existent) slot.
+  return errno == EROFS ? ResultCode::ReadOnly : ResultCode::EmptyRecording;
 }
 
 ResultCode writeOpenFailure() {
